@@ -29,7 +29,7 @@
     <div id="app">
         @include('components.navbar')
 
-        <main class="py-4 md:px-0 px-4 max-w-[1250px] mx-auto">
+        <main class="py-4 lg:px-0 px-4 max-w-[1250px] mx-auto">
             @include('components.messages')
             @yield('content')
         </main>

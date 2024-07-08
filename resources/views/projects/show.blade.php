@@ -4,7 +4,7 @@
 @section('content')
     <a href="/projects" class="py-1 px-4 border rounded-full hover:bg-gray-200 transition "> ⬅ Go Back</a>
 
-    <div class="mt-6 flex flex-col md:flex-row justify-between items-start md:items-center">
+    <div class="mt-6 flex flex-col lg:flex-row justify-between items-start lg:items-center">
         <div>
             <h2 class="font-medium text-xl">
                 {{ $project->title }}
