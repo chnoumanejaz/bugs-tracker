@@ -86,10 +86,6 @@ class ProjectsController extends Controller
     {
         $project = Projects::with('users')->findOrFail($id);
                  
-        // if(empty($project)){
-        //     return redirect('/projects')->with('error','No project found for the given id!');
-        // }
-        
         if(Gate::denies('view-project', $project)){
             return redirect('/projects')->with('error','You are not allowed to access the project which does not belongs to you.');
         }

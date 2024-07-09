@@ -125,17 +125,12 @@ class BugsController extends Controller
      */
     public function show(string $id)
     { 
-        $bug = Bugs::with('project', 'developer', 'qa')->find($id);
-        if(empty($bug)){
-            return redirect('/projects')->with('error','No bug found for the given id.');
-        }
-
-        $project = Projects::with('users')->find($bug->project_id);
+        $bug = Bugs::with('project', 'developer', 'qa')->findOrFail($id);
+        $project = Projects::with('users')->findOrFail($bug->project_id);
         
         if(Gate::denies('view-bug', $project)){
             return redirect('/projects')->with('error','You are trying to view a bug that does not belong to you.');
         }
-
         return view('bugs.show')->with('bug', $bug);
     }
 
