@@ -57,17 +57,14 @@
                         @endif
                     </div>
 
-                    <button type="submit"
-                        class="px-4 py-2 bg-teal-500 w-full text-white rounded hover:bg-teal-600 focus:outline-none focus:bg-teal-600">
+                    <button
+                        type="submit"
+                        class="px-4 py-2 bg-teal-500 w-full text-white rounded hover:bg-teal-600 focus:outline-none focus:bg-teal-600"
+                    >
                         Create the project
                     </button>
                 </form>
             </div>
         </div>
     </div>
-
-
-
-
-
 @endsection

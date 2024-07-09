@@ -84,11 +84,11 @@ class ProjectsController extends Controller
      */
     public function show(string $id)
     {
-        $project = Projects::with('users')->find($id);
+        $project = Projects::with('users')->findOrFail($id);
                  
-        if(empty($project)){
-            return redirect('/projects')->with('error','No project found for the given id!');
-        }
+        // if(empty($project)){
+        //     return redirect('/projects')->with('error','No project found for the given id!');
+        // }
         
         if(Gate::denies('view-project', $project)){
             return redirect('/projects')->with('error','You are not allowed to access the project which does not belongs to you.');
@@ -162,32 +162,64 @@ class ProjectsController extends Controller
     /**
      * Remove the specified resource from storage.
      */
+    // public function destroy(string $id)
+    // {
+    //     $project = Projects::with('users')->find($id);
+    //     $bugs = Bugs::where('project_id', $project->id)->get();
+             
+    //     $project->delete();
+
+    //     // Removing all the bugs on deletion of project
+    //     if($bugs && count($bugs) > 0){
+    //         for($i = 0; $i < count($bugs); $i++){
+    //             $bug = Bugs::find($bugs[$i]->id);
+    //              //  delete the image associated with the bug
+    //             if($bug->screenshot != null){
+    //                 Storage::delete('public/images/'. $bug->screenshot);
+    //             }
+    //             $bug->delete();
+    //         }
+    //     }
+
+    //     // Removing the access for all the users who has access to this project
+    //     if($project->users && count($project->users) > 0){
+    //         for($i = 0; $i < count($project->users); $i++){
+    //             $user = UserProjects::where('user_id' , $project->users[$i]->id)->where('project_id', $id);
+    //             $user->delete();
+    //         }
+    //     }
+    //     return redirect('/projects')->with('success', 'The project and all associated bugs have been successfully deleted! Access for associated members has been removed as well.');
+    // }
+
     public function destroy(string $id)
     {
+        // Retrieve the project with its users
         $project = Projects::with('users')->find($id);
+
+        if (!$project) {
+            return redirect('/projects')->with('error', 'Project not found.');
+        }
+
+        // Retrieve all bugs associated with the project
         $bugs = Bugs::where('project_id', $project->id)->get();
-             
+
+        // Delete the project
         $project->delete();
 
-        // Removing all the bugs on deletion of project
-        if($bugs && count($bugs) > 0){
-            for($i = 0; $i < count($bugs); $i++){
-                $bug = Bugs::find($bugs[$i]->id);
-                 //  delete the image associated with the bug
-                if($bug->screenshot != null){
-                    Storage::delete('public/images/'. $bug->screenshot);
-                }
-                $bug->delete();
+        // Delete bugs and associated images
+        foreach ($bugs as $bug) {
+            if ($bug->screenshot != null) {
+                Storage::delete('public/images/' . $bug->screenshot);
             }
+            $bug->delete();
         }
 
-        // Removing the access for all the users who has access to this project
-        if($project->users && count($project->users) > 0){
-            for($i = 0; $i < count($project->users); $i++){
-                $user = UserProjects::where('user_id' , $project->users[$i]->id)->where('project_id', $id);
-                $user->delete();
-            }
+        // Remove access for users associated with this project
+        foreach ($project->users as $user) {
+            UserProjects::where('user_id', $user->id)->where('project_id', $project->id)->delete();
         }
+
         return redirect('/projects')->with('success', 'The project and all associated bugs have been successfully deleted! Access for associated members has been removed as well.');
     }
+
 }

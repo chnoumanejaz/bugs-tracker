@@ -96,7 +96,7 @@
                                 <td class="px-6 py-4">
                                     <a href="/bugs/{{ $bug->id }}"
                                         class="font-medium text-teal-600 hover:text-teal-800 transition text-nowrap">
-                                        {{ $bug->title }}
+                                        {{ Str::subStr($bug->title, 0, 30) }}
                                     </a>
                                 </td>
                                 <td class="px-6 py-4 text-nowrap"> {{ $bug->type === 'Feature' ? '💡' : '🐞' }}

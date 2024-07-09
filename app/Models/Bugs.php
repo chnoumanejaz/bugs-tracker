@@ -9,6 +9,18 @@ class Bugs extends Model
 {
     use HasFactory;
 
+    // protected $fillable = [
+    //     'title',
+    //     'description',
+    //     'deadline',
+    //     'screenshot',
+    //     'type',
+    //     'status',
+    //     'project_id',
+    //     'qa_id',
+    //     'developer_id',
+    // ];
+
     public function project()
     {
         return $this->belongsTo(Projects::class);

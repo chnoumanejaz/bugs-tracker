@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Bugs;
 use App\Models\Projects;
+use App\Services\BugService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
@@ -12,9 +13,12 @@ use Illuminate\Support\Facades\Storage;
 class BugsController extends Controller
 {
  
-    public function __construct()
+    protected $bugService;
+
+    public function __construct(BugService $bugService)
     {
         $this->middleware('auth');
+        $this->bugService = $bugService;
     }
 
     public function index(){
@@ -27,27 +31,32 @@ class BugsController extends Controller
     public function create(Request $request)
     {
         $projectId = $request->query('project_id');
+        $project = $this->bugService->validateProject($projectId);
  
-        if(empty($projectId)) {
-            return redirect('/projects')->with('error','Please provide the project ID so we can continue creating the bug in that project.');
-        }
-        $project = Projects::with('users')->where('id', $projectId)->first();
+        // if(empty($projectId)) {
+        //     return redirect('/projects')->with('error','Please provide the project ID so we can continue creating the bug in that project.');
+        // }
+        // $project = Projects::with('users')->where('id', $projectId)->first();
 
-        if(empty($project)) {
-            return redirect('/projects')->with('error','The project ID is invalid. There is no project found with the given ID.');
-        }
+        // if(empty($project)) {
+        //     return redirect('/projects')->with('error','The project ID is invalid. There is no project found with the given ID.');
+        // }
 
-        if(Gate::denies('create-bug', $project)){
-            return redirect('/projects/'.$projectId)->with('error','Only QA person with project access are able to create the bug.');
+        // if(Gate::denies('create-bug', $project)){
+        //     return redirect('/projects/'.$projectId)->with('error','Only QA person with project access are able to create the bug.');
+        // }
+        if (isset($project['error'])) 
+        {
+            return redirect('/projects')->with('error', $project['error']);
         }
-
         session(['project_id' => $projectId]);
 
         // Only those developers who has the access of this specific project
-        $devsHaveAccess = $project->users->filter(function ($user) {
-            return $user->user_type == 'Developer';
-        });
-        return view("bugs.create")->with('project', $project)->with('users', $devsHaveAccess);
+        // $associatedDevs = $project->users->filter(function ($user) {
+        //     return $user->user_type == 'Developer';
+        // });
+        $associatedDevs = $this->bugService->getAssociatedDevs($project);
+        return view("bugs.create")->with('project', $project)->with('users', $associatedDevs);
     }
  
 
@@ -66,39 +75,47 @@ class BugsController extends Controller
 
         $projectId = session('project_id');
 
-        if(empty($projectId)) {
-            return redirect('/projects')->with('error','Please provide the project ID so we can continue creating the bug in that project.');
+        $bug = $this->bugService->createBug($request->all(), $projectId);
+
+        if (isset($bug['error'])) {
+            return redirect('/bugs/create?project_id=' . $projectId)->with('error', $bug['error']);
         }
+
+        // $projectId = session('project_id');
+
+        // if(empty($projectId)) {
+        //     return redirect('/projects')->with('error','Please provide the project ID so we can continue creating the bug in that project.');
+        // }
 
         // Checking for the unique name of bug in a project 
-        $presentBug = Bugs::where('title', $request->title)->where('project_id', $projectId)->first();
-        if($presentBug) {
-            return redirect('/bugs/create?project_id='.$projectId)->with('error','A bug with this title already exists in this project! Please choose a different title for the bug.');
-        }
+        // $presentBug = Bugs::where('title', $request->title)->where('project_id', $projectId)->first();
+        // if($presentBug) {
+        //     return redirect('/bugs/create?project_id='.$projectId)->with('error','A bug with this title already exists in this project! Please choose a different title for the bug.');
+        // }
 
-        if($request->hasFile('screenshot')){
-            $fileNameWithExt = $request->file('screenshot')->getClientOriginalName();
-            $fileName = pathinfo($fileNameWithExt, PATHINFO_FILENAME);
-            $extension = $request->file('screenshot')->getClientOriginalExtension();
-            if($extension != 'jpg' && $extension != 'png'){
-                return redirect('/bugs/create?project_id='.$projectId)->with('error','Only JPG or PNG image extensions are allowed.');
-            }
-            $fileNameToStore = $fileName .'_'. time() .'.'. $extension;
-            $request->file('screenshot')->storeAs('public/images', $fileNameToStore);  
-        }
+        // if($request->hasFile('screenshot')){
+        //     $fileNameWithExt = $request->file('screenshot')->getClientOriginalName();
+        //     $fileName = pathinfo($fileNameWithExt, PATHINFO_FILENAME);
+        //     $extension = $request->file('screenshot')->getClientOriginalExtension();
+        //     if($extension != 'jpg' && $extension != 'png'){
+        //         return redirect('/bugs/create?project_id='.$projectId)->with('error','Only JPG or PNG image extensions are allowed.');
+        //     }
+        //     $fileNameToStore = $fileName .'_'. time() .'.'. $extension;
+        //     $request->file('screenshot')->storeAs('public/images', $fileNameToStore);  
+        // }
          
       
-        $bug = new Bugs();
-        $bug->title = $request->title;
-        $bug->description = $request->description;
-        $bug->deadline = $request->deadline;
-        $bug->screenshot = $fileNameToStore ?? null;
-        $bug->type = $request->bugtype;
-        $bug->status = $request->bugstatus;
-        $bug->project_id = $projectId;
-        $bug->qa_id = Auth::user()->id;
-        $bug->developer_id = $request->assigntodev;
-        $bug->save();
+        // $bug = new Bugs();
+        // $bug->title = $request->title;
+        // $bug->description = $request->description;
+        // $bug->deadline = $request->deadline;
+        // $bug->screenshot = $fileNameToStore ?? null;
+        // $bug->type = $request->bugtype;
+        // $bug->status = $request->bugstatus;
+        // $bug->project_id = $projectId;
+        // $bug->qa_id = Auth::user()->id;
+        // $bug->developer_id = $request->assigntodev;
+        // $bug->save();
 
         return redirect('/bugs/'.$bug->id)->with('success','The bug has been successfully reported!');
     }
@@ -127,22 +144,26 @@ class BugsController extends Controller
      */
     public function edit(string $id)
     {
-        $bug = Bugs::find($id);
+        // $bug = Bugs::find($id);
 
-        if(empty($bug)){
-            return redirect('/projects')->with('error','No bug found for the given id!');
-        }
-        $project = Projects::with('users')->where('id', $bug->project_id)->first();
-        $devsHaveAccess = $project->users->filter(function ($user) {
-            return $user->user_type == 'Developer';
-        });
+        // if(empty($bug)){
+        //     return redirect('/projects')->with('error','No bug found for the given id!');
+        // }
+        // $project = Projects::with('users')->where('id', $bug->project_id)->first();
+        // $associatedDevs = $project->users->filter(function ($user) {
+        //     return $user->user_type == 'Developer';
+        // });
 
-        if(Gate::denies('edit-bug', $bug)){
-            return redirect('/bugs/'.$bug->id)->with('error','You are not permitted to edit the bug; only the QA who created it can do so.');
-        }
-        
-        return view('bugs.edit')->with('bug', $bug)->with('users', $devsHaveAccess);
-        
+        // if(Gate::denies('edit-bug', $bug)){
+        //     return redirect('/bugs/'.$bug->id)->with('error','You are not permitted to edit the bug; only the QA who created it can do so.');
+        // }
+
+        $bug = $this->bugService->editBug($id);
+       
+        if (isset($bug['error'])) {
+            return redirect('/projects')->with('error', $bug['error']);
+        }  
+        return view('bugs.edit')->with('bug', $bug)->with('users', $bug->associatedDevs);
     }
 
     /**
@@ -168,28 +189,33 @@ class BugsController extends Controller
 
         $bug = Bugs::find($id);
 
-        if($request->hasFile('screenshot')){
-            $fileNameWithExt = $request->file('screenshot')->getClientOriginalName();
-            $fileName = pathinfo($fileNameWithExt, PATHINFO_FILENAME);
-            $extension = $request->file('screenshot')->getClientOriginalExtension();
-            if($extension != 'jpg' && $extension != 'png'){
-                return redirect('/bugs/'.$bug->id.'/edit')->with('error','Only JPG or PNG image extensions are allowed.');
-            }
-            $fileNameToStore = $fileName .'_'. time() .'.'. $extension;
-            $request->file('screenshot')->storeAs('public/images', $fileNameToStore);  
+        // if($request->hasFile('screenshot')) {
+        //     $fileNameWithExt = $request->file('screenshot')->getClientOriginalName();
+        //     $fileName = pathinfo($fileNameWithExt, PATHINFO_FILENAME);
+        //     $extension = $request->file('screenshot')->getClientOriginalExtension();
+        //     if($extension != 'jpg' && $extension != 'png'){
+        //         return redirect('/bugs/'.$bug->id.'/edit')->with('error','Only JPG or PNG image extensions are allowed.');
+        //     }
+        //     $fileNameToStore = $fileName .'_'. time() .'.'. $extension;
+        //     $request->file('screenshot')->storeAs('public/images', $fileNameToStore);  
 
-            // also removing the old image
-            if($bug->screenshot != null){
-                Storage::delete('public/images/'. $bug->screenshot);
+        //     // also removing the old image
+        //     if($bug->screenshot != null){
+        //         Storage::delete('public/images/'. $bug->screenshot);
+        //     }
+        // }
+
+        if($request->hasFile('screenshot')) {
+            $fileNameToStore = $this->bugService->handleFileUpload($request->screenshot);
+            if (isset($fileNameToStore['error'])) {
+                return redirect('/bugs/'.$bug->id)->with('error',$fileNameToStore['error']);    
             }
+            $bug->screenshot = $fileNameToStore;
         }
 
         $bug->title = $request->title;
         $bug->description = $request->description;
         $bug->deadline = $request->deadline;
-        if($request->hasFile('screenshot')) {
-            $bug->screenshot = $fileNameToStore;
-        }
         $bug->type = $request->bugtype;
         $bug->status = $request->bugstatus;
         $bug->developer_id = $request->assigntodev;
