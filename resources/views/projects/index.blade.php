@@ -30,7 +30,7 @@
                             class="text-lg font-medium text-teal-600 hover:text-teal-800 transition-colors">{{ $project->title }}</a>
                         <p class="text-sm text-gray-600/75">Created on: {{ $project->created_at }}</p>
                         <p class="mt-2">
-                            {{ Str::substr($project->description, 0, 80) }}...
+                            {{ Str::words($project->description, 13) }}
                         </p>
                     </div>
                 @endforeach
