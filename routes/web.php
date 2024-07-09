@@ -3,9 +3,8 @@
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/', function () {
-    return redirect('/projects');
-});
+
+Route::redirect('/', '/projects');
 
 Auth::routes();
 
