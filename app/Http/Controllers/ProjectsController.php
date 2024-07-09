@@ -27,12 +27,12 @@ class ProjectsController extends Controller
         $user = Auth::user();
 
         if ($user->user_type === 'Manager') {
-             $projects = Projects::where('manager_id', $user->id)->get();
+             $projects = Projects::where('manager_id', $user->id)->paginate(9);
         } else {
             // for the qa and developers (show only those projects which are assigned to that user)
             $projects = Projects::whereHas('users', function ($query) use ($user) {
                 $query->where('user_id', $user->id);
-            })->get();
+            })->paginate(9);
          }
     
         return view('projects.index')->with('projects', $projects);

@@ -33,8 +33,11 @@
                             {{ Str::words($project->description, 13) }}
                         </p>
                     </div>
-                @endforeach
-            </div>
+                    @endforeach
+                </div>
+                <div class="mt-4 flex justify-end">
+                    {{$projects->links()}}
+                </div>
         @else
             <x-error>
                 You don't have any projects.
