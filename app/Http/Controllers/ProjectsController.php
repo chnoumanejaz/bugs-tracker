@@ -27,7 +27,7 @@ class ProjectsController extends Controller
         $user = Auth::user();
 
         if ($user->user_type === 'Manager') {
-             $projects = Projects::where('manager_id', $user->id)->paginate(9);
+             $projects = Projects::where('isDeleting', false)->where('manager_id', $user->id)->paginate(9);
         } else {
             // for the qa and developers (show only those projects which are assigned to that user)
             $projects = Projects::whereHas('users', function ($query) use ($user) {
@@ -155,67 +155,45 @@ class ProjectsController extends Controller
         return redirect('/projects/' . $id)->with('success', 'Project has been updated successfully!');
     }
 
-    /**
-     * Remove the specified resource from storage.
-     */
-    // public function destroy(string $id)
-    // {
-    //     $project = Projects::with('users')->find($id);
-    //     $bugs = Bugs::where('project_id', $project->id)->get();
-             
-    //     $project->delete();
-
-    //     // Removing all the bugs on deletion of project
-    //     if($bugs && count($bugs) > 0){
-    //         for($i = 0; $i < count($bugs); $i++){
-    //             $bug = Bugs::find($bugs[$i]->id);
-    //              //  delete the image associated with the bug
-    //             if($bug->screenshot != null){
-    //                 Storage::delete('public/images/'. $bug->screenshot);
-    //             }
-    //             $bug->delete();
-    //         }
-    //     }
-
-    //     // Removing the access for all the users who has access to this project
-    //     if($project->users && count($project->users) > 0){
-    //         for($i = 0; $i < count($project->users); $i++){
-    //             $user = UserProjects::where('user_id' , $project->users[$i]->id)->where('project_id', $id);
-    //             $user->delete();
-    //         }
-    //     }
-    //     return redirect('/projects')->with('success', 'The project and all associated bugs have been successfully deleted! Access for associated members has been removed as well.');
-    // }
 
     public function destroy(string $id)
     {
-        // Retrieve the project with its users
         $project = Projects::with('users')->find($id);
 
         if (!$project) {
             return redirect('/projects')->with('error', 'Project not found.');
         }
 
-        // Retrieve all bugs associated with the project
-        $bugs = Bugs::where('project_id', $project->id)->get();
+        $project->isDeleting = true;
+        $project->save();
 
-        // Delete the project
-        $project->delete();
+        dispatch(function () use ($project) {
+            try {
+                // all bugs associated with the project
+                $bugs = Bugs::where('project_id', $project->id)->get();
 
-        // Delete bugs and associated images
-        foreach ($bugs as $bug) {
-            if ($bug->screenshot != null) {
-                Storage::delete('public/images/' . $bug->screenshot);
+                // Delete bugs and associated images
+                foreach ($bugs as $bug) {
+                    if ($bug->screenshot) {
+                        Storage::delete('public/images/' . $bug->screenshot);
+                    }
+                    $bug->delete();
+                }
+
+                // Remove access for users associated with this project
+                foreach ($project->users as $user) {
+                    UserProjects::where('user_id', $user->id)
+                                ->where('project_id', $project->id)
+                                ->delete();
+                }
+
+                $project->delete();
+            } catch (\Exception $e) {
+                $project->deleting = false;
+                $project->save();
             }
-            $bug->delete();
-        }
+         })->delay(10);
 
-        // Remove access for users associated with this project
-        foreach ($project->users as $user) {
-            UserProjects::where('user_id', $user->id)->where('project_id', $project->id)->delete();
-        }
-
-        return redirect('/projects')->with('success', 'The project and all associated bugs have been successfully deleted! Access for associated members has been removed as well.');
+        return redirect('/projects')->with('success', "We're Deleting project and removing all the bugs present in the project..."); 
     }
-
 }
